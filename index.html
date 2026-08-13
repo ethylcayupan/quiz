@@ -184,7 +184,7 @@ A. Choice one*
 B. Choice two
 C. Choice three"></textarea>
       <div class="row">
-        <input type="text" id="quizTitle" placeholder="Quiz title">
+        <input type="text" id="quizTitle" placeholder="Quiz title (e.g. Cybersecurity Quiz)">
       </div>
       <div class="row">
         <button onclick="parseAndBuild()">Create Quiz</button>
@@ -257,10 +257,11 @@ function goHome(){
 
 function encodeQuiz(data){
   const json = JSON.stringify(data);
-  return btoa(encodeURIComponent(json).replace(/%([0-9A-F]{2})/g, (m,p)=>String.fromCharCode('0x'+p)));
+  return LZString.compressToEncodedURIComponent(json);
 }
 function decodeQuiz(str){
-  const json = decodeURIComponent(atob(str).split('').map(c=>'%'+('00'+c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+  const json = LZString.decompressFromEncodedURIComponent(str);
+  if(!json) throw new Error('decode failed');
   return JSON.parse(json);
 }
 
@@ -496,5 +497,6 @@ function checkUrlForQuiz(){
 window.addEventListener('load', checkUrlForQuiz);
 window.addEventListener('hashchange', checkUrlForQuiz);
 </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
 </body>
 </html>
