@@ -170,13 +170,19 @@
   <!-- CREATE VIEW -->
   <div id="createView">
     <div class="card">
-      <label>Paste your questions here (format: numbered, A/B/C/D options, mark the correct one with *)</label>
+      <label>Paste your questions here — numbered questions, one option per line, mark the correct one with *. A/B/C/D letters are optional.</label>
       <textarea id="rawInput" placeholder="1. Question goes here?
 
-A. Choice one
-B. Choice two*
-C. Choice three
-D. Choice four"></textarea>
+Choice one
+Choice two*
+Choice three
+Choice four
+
+2. Another question?
+
+A. Choice one*
+B. Choice two
+C. Choice three"></textarea>
       <div class="row">
         <input type="text" id="quizTitle" placeholder="Quiz title (e.g. Cybersecurity Quiz)">
       </div>
@@ -262,6 +268,7 @@ function parseQuestions(raw){
   const lines = raw.split('\n');
   const questions = [];
   let current = null;
+  const autoLetters = ['A','B','C','D','E','F','G','H','I','J'];
 
   const qStart = /^\s*(\d+)[\.\)]\s*(.+)/;
   const optStart = /^\s*([A-Da-d])[\.\)]\s*(.+)/;
@@ -272,30 +279,23 @@ function parseQuestions(raw){
     if(!line) continue;
 
     const qm = line.match(qStart);
-    const om = line.match(optStart);
     const am = line.match(answerLine);
 
+    // a new numbered question always starts a fresh question block
     if(qm){
       if(current) questions.push(current);
       current = { text: qm[2].trim(), options: [], correct: null };
       continue;
     }
-    if(om && current){
-      let optText = om[2].trim();
-      let letter = om[1].toUpperCase();
-      let isCorrect = false;
-      if(optText.includes('*')){
-        isCorrect = true;
-        optText = optText.replace(/\*/g,'').trim();
-      }
-      current.options.push({ letter, text: optText });
-      if(isCorrect) current.correct = letter;
-      continue;
-    }
-    if(am && current){
+
+    if(!current) continue;
+
+    // an "Answer: X" line sets the correct option (works with or without ABCD)
+    if(am){
       let ans = am[1].trim();
-      const letterMatch = ans.match(/^([A-Da-d])/);
-      if(letterMatch){
+      const letterMatch = ans.match(/^([A-Da-d])\b/);
+      const isKnownLetter = letterMatch && current.options.some(o=>o.letter===letterMatch[1].toUpperCase());
+      if(isKnownLetter){
         current.correct = letterMatch[1].toUpperCase();
       } else {
         const clean = ans.replace(/\*/g,'').trim().toLowerCase();
@@ -304,9 +304,23 @@ function parseQuestions(raw){
       }
       continue;
     }
-    if(current && current.options.length===0){
-      current.text += ' ' + line;
+
+    // otherwise this line is an option — with an A./B./C. prefix, or plain text (ABCD optional)
+    const om = line.match(optStart);
+    let optText, letter, isCorrect = false;
+    if(om){
+      letter = om[1].toUpperCase();
+      optText = om[2].trim();
+    } else {
+      letter = autoLetters[current.options.length] || String(current.options.length + 1);
+      optText = line;
     }
+    if(optText.includes('*')){
+      isCorrect = true;
+      optText = optText.replace(/\*/g,'').trim();
+    }
+    current.options.push({ letter, text: optText });
+    if(isCorrect) current.correct = letter;
   }
   if(current) questions.push(current);
   return questions.filter(q=>q.options.length>=2 && q.correct);
