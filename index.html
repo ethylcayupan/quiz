@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quiz Maker</title>
+<style>
+  :root{
+    --ink:#221c35;
+    --paper:#f6f4fb;
+    --card:#ffffff;
+    --accent:#6d28d9;
+    --accent2:#a855f7;
+    --line:#e0d9f0;
+    --muted:#6b6280;
+    --good:#15803d;
+    --bad:#b91c1c;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Segoe UI',Helvetica,Arial,sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    padding:24px;
+  }
+  .wrap{max-width:720px;margin:0 auto;}
+  h1{
+    font-size:28px;
+    margin:0 0 4px 0;
+    letter-spacing:-0.5px;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+    display:inline-block;
+  }
+  .sub{color:var(--muted);margin-bottom:24px;font-size:14px;}
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:20px;
+    margin-bottom:16px;
+    box-shadow:0 2px 10px rgba(109,40,217,0.05);
+  }
+  textarea{
+    width:100%;
+    min-height:260px;
+    padding:12px;
+    border:1px solid var(--line);
+    border-radius:8px;
+    font-family:monospace;
+    font-size:13px;
+    resize:vertical;
+  }
+  textarea:focus, input:focus{
+    outline:2px solid var(--accent2);
+    outline-offset:1px;
+  }
+  button{
+    background:var(--accent);
+    color:#fff;
+    border:none;
+    padding:12px 20px;
+    border-radius:8px;
+    font-size:15px;
+    cursor:pointer;
+    font-weight:600;
+  }
+  button:hover{background:var(--accent2);}
+  button.secondary{
+    background:transparent;
+    color:var(--accent);
+    border:1px solid var(--accent);
+  }
+  button.secondary:hover{background:#f2ecfb;color:var(--accent);}
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;}
+  input[type=text]{
+    padding:10px 12px;
+    border:1px solid var(--line);
+    border-radius:8px;
+    font-size:14px;
+    flex:1;
+    min-width:180px;
+  }
+  .q{
+    margin-bottom:22px;
+    padding-bottom:18px;
+    border-bottom:1px solid var(--line);
+  }
+  .q:last-child{border-bottom:none;}
+  .qtext{font-weight:600;margin-bottom:10px;}
+  .opt{
+    display:block;
+    padding:10px 12px;
+    border:1px solid var(--line);
+    border-radius:8px;
+    margin-bottom:8px;
+    cursor:pointer;
+  }
+  .opt:hover{border-color:var(--accent2);}
+  .opt.selected{border-color:var(--accent);background:#f2ecfb;}
+  .opt.correct{border-color:var(--good);background:#e6f5ea;font-weight:600;}
+  .opt.wrong{border-color:var(--bad);background:#fbe9e9;}
+  .badge{
+    display:inline-block;
+    padding:4px 10px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:600;
+    background:var(--accent);
+    color:#fff;
+  }
+  .score{
+    font-size:40px;
+    font-weight:700;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+  }
+  .link-box{
+    background:#f2ecfb;
+    border:1px dashed var(--accent);
+    border-radius:8px;
+    padding:12px;
+    font-family:monospace;
+    word-break:break-all;
+    margin-top:10px;
+    font-size:13px;
+  }
+  .hidden{display:none;}
+  .muted{color:var(--muted);font-size:13px;}
+  label{font-size:13px;color:var(--muted);display:block;margin-bottom:4px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Quiz Maker</h1>
+  <div class="sub">Paste your questions, generate a shareable link, anyone can take it.</div>
+
+  <!-- CREATE VIEW -->
+  <div id="createView">
+    <div class="card">
+      <label>Paste your questions here (format: numbered, A/B/C/D options, mark the correct one with *)</label>
+      <textarea id="rawInput" placeholder="1. Question goes here?
+
+A. Choice one
+B. Choice two*
+C. Choice three
+D. Choice four"></textarea>
+      <div class="row">
+        <input type="text" id="quizTitle" placeholder="Quiz title (e.g. Cybersecurity Quiz)">
+      </div>
+      <div class="row">
+        <button onclick="parseAndBuild()">Create Quiz</button>
+        <button class="secondary" onclick="document.getElementById('rawInput').value=''">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHARE VIEW -->
+  <div id="shareView" class="hidden">
+    <div class="card">
+      <span class="badge">Ready</span>
+      <h2 id="createdTitle" style="margin:12px 0 4px 0;"></h2>
+      <div class="muted">Share this link — anyone who opens it can take the quiz directly:</div>
+      <div class="link-box" id="quizLinkDisplay"></div>
+      <div class="row">
+        <button onclick="copyLink()">Copy Link</button>
+        <button class="secondary" onclick="goHome()">Back to Home</button>
+      </div>
+      <p class="muted" style="margin-top:14px;">
+        This link works once the file is hosted online (e.g. GitHub Pages). Opening it locally from your computer won't work.
+      </p>
+    </div>
+  </div>
+
+  <!-- TAKE VIEW -->
+  <div id="takeView" class="hidden">
+    <div class="card">
+      <h2 id="takeTitle"></h2>
+    </div>
+    <div id="questionsContainer"></div>
+    <div class="row">
+      <button onclick="submitQuiz()">Submit Answers</button>
+    </div>
+  </div>
+
+  <!-- RESULT VIEW -->
+  <div id="resultView" class="hidden">
+    <div class="card" style="text-align:center;">
+      <div class="muted">Your Score</div>
+      <div class="score" id="scoreDisplay"></div>
+    </div>
+    <div id="reviewContainer"></div>
+    <div class="row">
+      <button onclick="goHome()">Back to Home</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentQuiz = null;
+let userAnswers = {};
+
+function show(id){
+  ['createView','shareView','takeView','resultView'].forEach(v=>{
+    document.getElementById(v).classList.toggle('hidden', v!==id);
+  });
+}
+function goHome(){
+  history.pushState('', document.title, window.location.pathname + window.location.search);
+  show('createView');
+}
+
+function encodeQuiz(data){
+  const json = JSON.stringify(data);
+  return btoa(encodeURIComponent(json).replace(/%([0-9A-F]{2})/g, (m,p)=>String.fromCharCode('0x'+p)));
+}
+function decodeQuiz(str){
+  const json = decodeURIComponent(atob(str).split('').map(c=>'%'+('00'+c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+  return JSON.parse(json);
+}
+
+function parseQuestions(raw){
+  const lines = raw.split('\n');
+  const questions = [];
+  let current = null;
+
+  const qStart = /^\s*(\d+)[\.\)]\s*(.+)/;
+  const optStart = /^\s*([A-Da-d])[\.\)]\s*(.+)/;
+  const answerLine = /^\s*Answer:\s*(.+)/i;
+
+  for(let raw_line of lines){
+    let line = raw_line.trim();
+    if(!line) continue;
+
+    const qm = line.match(qStart);
+    const om = line.match(optStart);
+    const am = line.match(answerLine);
+
+    if(qm){
+      if(current) questions.push(current);
+      current = { text: qm[2].trim(), options: [], correct: null };
+      continue;
+    }
+    if(om && current){
+      let optText = om[2].trim();
+      let letter = om[1].toUpperCase();
+      let isCorrect = false;
+      if(optText.includes('*')){
+        isCorrect = true;
+        optText = optText.replace(/\*/g,'').trim();
+      }
+      current.options.push({ letter, text: optText });
+      if(isCorrect) current.correct = letter;
+      continue;
+    }
+    if(am && current){
+      let ans = am[1].trim();
+      const letterMatch = ans.match(/^([A-Da-d])/);
+      if(letterMatch){
+        current.correct = letterMatch[1].toUpperCase();
+      } else {
+        const clean = ans.replace(/\*/g,'').trim().toLowerCase();
+        const found = current.options.find(o=>o.text.toLowerCase()===clean);
+        if(found) current.correct = found.letter;
+      }
+      continue;
+    }
+    if(current && current.options.length===0){
+      current.text += ' ' + line;
+    }
+  }
+  if(current) questions.push(current);
+  return questions.filter(q=>q.options.length>=2 && q.correct);
+}
+
+function parseAndBuild(){
+  const raw = document.getElementById('rawInput').value;
+  const title = document.getElementById('quizTitle').value.trim() || 'Untitled Quiz';
+  const questions = parseQuestions(raw);
+
+  if(questions.length===0){
+    alert('No questions detected. Make sure each question has A./B./C./D. options and a "*" next to the correct answer (or an "Answer:" line).');
+    return;
+  }
+
+  const quizData = { title, questions };
+  const encoded = encodeQuiz(quizData);
+  const url = window.location.origin + window.location.pathname + '#quiz=' + encoded;
+
+  document.getElementById('createdTitle').textContent = title + ' (' + questions.length + ' questions)';
+  document.getElementById('quizLinkDisplay').textContent = url;
+  show('shareView');
+}
+
+function copyLink(){
+  const link = document.getElementById('quizLinkDisplay').textContent;
+  navigator.clipboard.writeText(link).then(()=>alert('Link copied!'));
+}
+
+function escapeHtml(s){
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function renderTakeView(){
+  document.getElementById('takeTitle').textContent = currentQuiz.title;
+  const container = document.getElementById('questionsContainer');
+  container.innerHTML = '';
+
+  currentQuiz.questions.forEach((q, qi)=>{
+    const div = document.createElement('div');
+    div.className = 'card q';
+    let html = `<div class="qtext">${qi+1}. ${escapeHtml(q.text)}</div>`;
+    q.options.forEach(opt=>{
+      html += `<div class="opt" data-q="${qi}" data-letter="${opt.letter}" onclick="selectOption(${qi}, '${opt.letter}')">
+        <strong>${opt.letter}.</strong> ${escapeHtml(opt.text)}
+      </div>`;
+    });
+    div.innerHTML = html;
+    container.appendChild(div);
+  });
+
+  show('takeView');
+}
+
+function selectOption(qi, letter){
+  userAnswers[qi] = letter;
+  document.querySelectorAll(`.opt[data-q="${qi}"]`).forEach(el=>{
+    el.classList.toggle('selected', el.dataset.letter===letter);
+  });
+}
+
+function submitQuiz(){
+  const total = currentQuiz.questions.length;
+  let score = 0;
+  currentQuiz.questions.forEach((q, qi)=>{
+    if(userAnswers[qi] === q.correct) score++;
+  });
+
+  document.getElementById('scoreDisplay').textContent = score + ' / ' + total;
+
+  const reviewContainer = document.getElementById('reviewContainer');
+  reviewContainer.innerHTML = '';
+  currentQuiz.questions.forEach((q, qi)=>{
+    const div = document.createElement('div');
+    div.className = 'card q';
+    let html = `<div class="qtext">${qi+1}. ${escapeHtml(q.text)}</div>`;
+    q.options.forEach(opt=>{
+      let cls = 'opt';
+      if(opt.letter===q.correct) cls += ' correct';
+      else if(opt.letter===userAnswers[qi]) cls += ' wrong';
+      html += `<div class="${cls}"><strong>${opt.letter}.</strong> ${escapeHtml(opt.text)}</div>`;
+    });
+    div.innerHTML = html;
+    reviewContainer.appendChild(div);
+  });
+
+  show('resultView');
+}
+
+function checkUrlForQuiz(){
+  const hash = window.location.hash;
+  if(hash.startsWith('#quiz=')){
+    const encoded = hash.substring(6);
+    try{
+      currentQuiz = decodeQuiz(encoded);
+      userAnswers = {};
+      renderTakeView();
+    }catch(e){
+      alert('This quiz link looks broken or incomplete.');
+      show('createView');
+    }
+  } else {
+    show('createView');
+  }
+}
+
+window.addEventListener('load', checkUrlForQuiz);
+window.addEventListener('hashchange', checkUrlForQuiz);
+</script>
+</body>
+</html>
