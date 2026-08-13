@@ -69,12 +69,21 @@
     font-weight:600;
   }
   button:hover{background:var(--accent2);}
+  button:disabled{
+    background:#cabde8;
+    cursor:not-allowed;
+  }
   button.secondary{
     background:transparent;
     color:var(--accent);
     border:1px solid var(--accent);
   }
   button.secondary:hover{background:#f2ecfb;color:var(--accent);}
+  button.secondary:disabled{
+    background:transparent;
+    color:#c2b8d6;
+    border-color:#e0d9f0;
+  }
   .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;}
   input[type=text]{
     padding:10px 12px;
@@ -90,7 +99,7 @@
     border-bottom:1px solid var(--line);
   }
   .q:last-child{border-bottom:none;}
-  .qtext{font-weight:600;margin-bottom:10px;}
+  .qtext{font-weight:600;margin-bottom:10px;font-size:16px;}
   .opt{
     display:block;
     padding:10px 12px;
@@ -133,6 +142,24 @@
   .hidden{display:none;}
   .muted{color:var(--muted);font-size:13px;}
   label{font-size:13px;color:var(--muted);display:block;margin-bottom:4px;}
+  .progress-wrap{
+    background:var(--line);
+    border-radius:999px;
+    height:8px;
+    overflow:hidden;
+    margin-top:10px;
+  }
+  .progress-bar{
+    background:linear-gradient(90deg,var(--accent),var(--accent2));
+    height:100%;
+    width:0%;
+    transition:width .2s ease;
+  }
+  .nav-row{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+  }
 </style>
 </head>
 <body>
@@ -180,11 +207,17 @@ D. Choice four"></textarea>
   <!-- TAKE VIEW -->
   <div id="takeView" class="hidden">
     <div class="card">
-      <h2 id="takeTitle"></h2>
+      <h2 id="takeTitle" style="margin:0 0 6px 0;"></h2>
+      <div class="muted" id="progressText"></div>
+      <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
     </div>
     <div id="questionsContainer"></div>
-    <div class="row">
-      <button onclick="submitQuiz()">Submit Answers</button>
+    <div class="row nav-row">
+      <button class="secondary" id="prevBtn" onclick="prevQuestion()">Back</button>
+      <div style="display:flex;gap:10px;">
+        <button id="nextBtn" onclick="nextQuestion()">Next</button>
+        <button id="submitBtn" class="hidden" onclick="submitQuiz()">Submit Answers</button>
+      </div>
     </div>
   </div>
 
@@ -204,6 +237,7 @@ D. Choice four"></textarea>
 <script>
 let currentQuiz = null;
 let userAnswers = {};
+let currentQuestionIndex = 0;
 
 function show(id){
   ['createView','shareView','takeView','resultView'].forEach(v=>{
@@ -308,25 +342,57 @@ function escapeHtml(s){
   return d.innerHTML;
 }
 
+function shuffleArray(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+
 function renderTakeView(){
   document.getElementById('takeTitle').textContent = currentQuiz.title;
-  const container = document.getElementById('questionsContainer');
-  container.innerHTML = '';
 
-  currentQuiz.questions.forEach((q, qi)=>{
-    const div = document.createElement('div');
-    div.className = 'card q';
-    let html = `<div class="qtext">${qi+1}. ${escapeHtml(q.text)}</div>`;
-    q.options.forEach(opt=>{
-      html += `<div class="opt" data-q="${qi}" data-letter="${opt.letter}" onclick="selectOption(${qi}, '${opt.letter}')">
-        <strong>${opt.letter}.</strong> ${escapeHtml(opt.text)}
-      </div>`;
-    });
-    div.innerHTML = html;
-    container.appendChild(div);
-  });
+  // randomize question order for this attempt, keep original index for scoring
+  currentQuiz.displayOrder = shuffleArray(currentQuiz.questions.map((q, idx)=>idx));
+  currentQuestionIndex = 0;
 
+  renderCurrentQuestion();
   show('takeView');
+}
+
+function renderCurrentQuestion(){
+  const total = currentQuiz.displayOrder.length;
+  const origIdx = currentQuiz.displayOrder[currentQuestionIndex];
+  const q = currentQuiz.questions[origIdx];
+
+  // progress
+  document.getElementById('progressText').textContent =
+    'Question ' + (currentQuestionIndex+1) + ' of ' + total;
+  document.getElementById('progressBar').style.width =
+    (((currentQuestionIndex+1)/total)*100) + '%';
+
+  // render single question, no A/B/C/D labels shown
+  const container = document.getElementById('questionsContainer');
+  const div = document.createElement('div');
+  div.className = 'card q';
+  let html = `<div class="qtext">${escapeHtml(q.text)}</div>`;
+  q.options.forEach(opt=>{
+    const isSelected = userAnswers[origIdx] === opt.letter;
+    html += `<div class="opt${isSelected ? ' selected' : ''}" data-q="${origIdx}" data-letter="${opt.letter}" onclick="selectOption(${origIdx}, '${opt.letter}')">
+      ${escapeHtml(opt.text)}
+    </div>`;
+  });
+  div.innerHTML = html;
+  container.innerHTML = '';
+  container.appendChild(div);
+
+  // nav buttons
+  document.getElementById('prevBtn').disabled = currentQuestionIndex === 0;
+  const isLast = currentQuestionIndex === total - 1;
+  document.getElementById('nextBtn').classList.toggle('hidden', isLast);
+  document.getElementById('submitBtn').classList.toggle('hidden', !isLast);
 }
 
 function selectOption(qi, letter){
@@ -334,6 +400,20 @@ function selectOption(qi, letter){
   document.querySelectorAll(`.opt[data-q="${qi}"]`).forEach(el=>{
     el.classList.toggle('selected', el.dataset.letter===letter);
   });
+}
+
+function nextQuestion(){
+  if(currentQuestionIndex < currentQuiz.displayOrder.length - 1){
+    currentQuestionIndex++;
+    renderCurrentQuestion();
+  }
+}
+
+function prevQuestion(){
+  if(currentQuestionIndex > 0){
+    currentQuestionIndex--;
+    renderCurrentQuestion();
+  }
 }
 
 function submitQuiz(){
@@ -345,18 +425,36 @@ function submitQuiz(){
 
   document.getElementById('scoreDisplay').textContent = score + ' / ' + total;
 
+  // review: show questions with wrong answers first (with correct answer highlighted),
+  // then the ones answered correctly — no A/B/C/D labels
   const reviewContainer = document.getElementById('reviewContainer');
   reviewContainer.innerHTML = '';
-  currentQuiz.questions.forEach((q, qi)=>{
+
+  const wrongHeader = document.createElement('div');
+  wrongHeader.className = 'muted';
+  wrongHeader.style.margin = '10px 4px';
+
+  const order = currentQuiz.questions.map((q, qi)=>qi).sort((a,b)=>{
+    const aWrong = userAnswers[a] !== currentQuiz.questions[a].correct;
+    const bWrong = userAnswers[b] !== currentQuiz.questions[b].correct;
+    return (bWrong - aWrong);
+  });
+
+  order.forEach(qi=>{
+    const q = currentQuiz.questions[qi];
     const div = document.createElement('div');
     div.className = 'card q';
-    let html = `<div class="qtext">${qi+1}. ${escapeHtml(q.text)}</div>`;
+    const wasWrong = userAnswers[qi] !== q.correct;
+    let html = `<div class="qtext">${wasWrong ? '❌ ' : '✅ '}${escapeHtml(q.text)}</div>`;
     q.options.forEach(opt=>{
       let cls = 'opt';
       if(opt.letter===q.correct) cls += ' correct';
       else if(opt.letter===userAnswers[qi]) cls += ' wrong';
-      html += `<div class="${cls}"><strong>${opt.letter}.</strong> ${escapeHtml(opt.text)}</div>`;
+      html += `<div class="${cls}">${escapeHtml(opt.text)}</div>`;
     });
+    if(userAnswers[qi] === undefined){
+      html += `<div class="muted" style="margin-top:6px;">You didn't answer this one.</div>`;
+    }
     div.innerHTML = html;
     reviewContainer.appendChild(div);
   });
